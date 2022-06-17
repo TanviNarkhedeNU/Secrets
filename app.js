@@ -6,7 +6,10 @@ const bodyParser = require("body-parser");
 const mongoose = require("mongoose")
 const app = express();
 const ejs = require("ejs");
-const encrypt = require("mongoose-encryption")
+const md5 = require("md5")
+const brcypt = require("brcypt");
+const saltRounds = 10;
+
 app.use(express.static("public"));
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({extended: true}));
@@ -20,7 +23,6 @@ const userSchema = new mongoose.Schema({
 });
 
 //const secret = "Thisisourlittlesecret!"; this will go to .env
-userSchema.plugin(encrypt, {secret: process.env.SECRET, encryptedFields: ["password"]});
 const User = new mongoose.model("User", userSchema);//And now we can use our userSchema to set up a new user model. So it's going to be a new mongoose.model and then we have to specify the name of our collection which is also going to be User in the singular form with a capital U and it's going to be created using that userSchema that we made just there. So now we can start creating users and adding it to this userDB.
 
 app.get("/", function(req, res){
@@ -36,17 +38,21 @@ app.get("/register", function(req, res){
 });
 
 app.post("/register", function(req, res){
-  const newUser = new User({
-    email: req.body.username,
-    password: req.body.password
-  });
-  newUser.save(function(err){
-    if(err){
-      console.log(err);
-    }else{
-      res.render("secrets");
-    };
-  });
+  bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+    const newUser = new User({
+      email: req.body.username,
+      password: hash// this is for storinh "hash" in your db
+    });
+    newUser.save(function(err){
+      if(err){
+        console.log(err);
+      }else{
+        res.render("secrets");
+      };
+    });
+    // Store hash in your password DB.
+});
+
 });
 app.post("/login", function(req, res){
   const userName  = req.body.username;
@@ -56,13 +62,19 @@ app.post("/login", function(req, res){
       console.log(err);
     }else{
       if(foundUser){
-        if(foundUser.password === passWord){
-          res.render("secrets");
-        }
+        bcrypt.compare(passWord, foundUser.password, function(err, result){
+          if(result === true){
+            res.render("secrets");
+
+          }
+
+        });
       }
     }
   });
-})
+});
+
+
 
 app.listen(3000, function(){
   console.log("Server is running");
